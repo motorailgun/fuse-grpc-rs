@@ -191,8 +191,17 @@ impl Filesystem for GrpcFs {
         }
     }
 
-    fn open(&mut self, _req: &fuser::Request<'_>, _ino: u64, _flags: i32, reply: fuser::ReplyOpen) {
-        reply.error(ENOENT)
+    fn open(&mut self, _req: &fuser::Request<'_>, inode: u64, flags: i32, reply: fuser::ReplyOpen) {
+        match self.inode_map.get(&inode) {
+            Some(path) => {
+                if path.is_file() {
+                    reply.opened(0, flags as u32);
+                }
+            },
+            None => {
+                reply.error(ENOENT);
+            }
+        }
     }
 
     fn read(
