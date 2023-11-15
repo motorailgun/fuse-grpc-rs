@@ -79,14 +79,20 @@ impl Filesystem for GrpcFs {
     fn lookup(
         &mut self,
         _req: &fuser::Request<'_>,
-        _parent: u64,
+        parent: u64,
         name: &std::ffi::OsStr,
         reply: fuser::ReplyEntry,
     ) {
         debug!("lookup");
         let default_duration = Duration::from_secs(1);
+        let name = if let Some(parent_path) = self.inode_map.get(&parent) {
+            Path::new(parent_path).join(name)
+        } else {
+            reply.error(ENOENT);
+            return;
+        };
 
-        match fs::metadata(name) {
+        match fs::metadata(&name) {
             Ok(dentry_metadata) => {
                 let attr = |kind| fuser::FileAttr {
                     ino: dentry_metadata.ino(),
