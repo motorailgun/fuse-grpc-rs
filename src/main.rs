@@ -155,6 +155,10 @@ impl Filesystem for GrpcFs {
                 for (i, entry) in entries.iter().enumerate().skip(offset as usize) {
                     let file_type = if entry.path().is_dir() {FileType::Directory} else {FileType::RegularFile};
                     let file_name = entry.file_name();
+                    let inode = entry.ino();
+                    debug!("inode: {}, file_name: {:?}", inode, file_name);
+
+                    self.inode_map.insert(inode, entry.path().to_str().unwrap().to_string());
                     if reply.add(inode, (i + 1) as i64, file_type, file_name) {
                         break;
                     }
