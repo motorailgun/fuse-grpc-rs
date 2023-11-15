@@ -6,13 +6,14 @@ use std::collections::BTreeMap;
 use std::env;
 use std::fs;
 use std::fs::DirEntry;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::prelude::*;
+use std::str::FromStr;
 use std::time::{Duration, SystemTime};
 
 struct GrpcFs {
-    inode_map: BTreeMap<u64, String>,
+    inode_map: BTreeMap<u64, PathBuf>,
 }
 
 impl GrpcFs {
@@ -21,7 +22,7 @@ impl GrpcFs {
             inode_map: BTreeMap::new(),
         };
 
-        fs.inode_map.insert(1, "/".to_string());
+        fs.inode_map.insert(1, PathBuf::from_str("/").unwrap());
         fs
     }
 }
@@ -67,7 +68,7 @@ impl Filesystem for GrpcFs {
                     }
                 },
                 Err(_) => {
-                    debug!("failed to get metadata of {}", path);
+                    debug!("failed to get metadata of {}", path.display());
                     reply.error(ENOENT);
                 }
             }
@@ -112,15 +113,7 @@ impl Filesystem for GrpcFs {
                     flags: 0, // as I don't use this thing on macOS
                 };
 
-                let path_str = match name.to_str() {
-                    Some(path_str) => path_str,
-                    None => {
-                        debug!("failed to convert path to string");
-                        reply.error(ENOENT);
-                        return;
-                    }
-                };
-                self.inode_map.insert(dentry_metadata.ino(), path_str.to_string());
+                self.inode_map.insert(dentry_metadata.ino(), name);
 
                 if dentry_metadata.is_dir() {
                     reply.entry(&default_duration, &attr(fuser::FileType::Directory), 0)
@@ -164,7 +157,7 @@ impl Filesystem for GrpcFs {
                     let inode = entry.ino();
                     debug!("inode: {}, file_name: {:?}", inode, file_name);
 
-                    self.inode_map.insert(inode, entry.path().to_str().unwrap().to_string());
+                    self.inode_map.insert(inode, entry.path());
                     if reply.add(inode, (i + 1) as i64, file_type, file_name) {
                         break;
                     }
