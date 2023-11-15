@@ -22,8 +22,16 @@ impl GrpcFs {
             inode_map: BTreeMap::new(),
         };
 
-        fs.inode_map.insert(1, PathBuf::from_str("/").unwrap());
+        fs.inode_map.insert(0, PathBuf::from_str("/").unwrap());
         fs
+    }
+
+    fn append_inode(&mut self, key: u64, path: PathBuf) -> Result<(), String> {
+        if key == 1 {
+            return Err("inode number 1 is reserved for root directory".to_string());
+        }
+        self.inode_map.insert(key, path);
+        Ok(())
     }
 }
 
@@ -111,7 +119,11 @@ impl Filesystem for GrpcFs {
                     flags: 0, // as I don't use this thing on macOS
                 };
 
-                self.inode_map.insert(dentry_metadata.ino(), name);
+                debug!("insert: inode {}, path {}", dentry_metadata.ino(), name.display());
+                match self.append_inode(dentry_metadata.ino(), name) {
+                    Err(err) => warn!("{}", err),
+                    _ => (),
+                }
 
                 if dentry_metadata.is_dir() {
                     reply.entry(&default_duration, &attr(fuser::FileType::Directory), 0)
@@ -159,7 +171,12 @@ impl Filesystem for GrpcFs {
                     let inode = entry.ino();
                     debug!("inode: {}, file_name: {:?}", inode, file_name);
 
-                    self.inode_map.insert(inode, entry.path());
+                    debug!("insert: inode {}, path {}", inode, entry.path().display());
+                    match self.append_inode(inode, entry.path()) {
+                        Err(err) => warn!("{}", err),
+                        _ => (),
+                    }
+
                     if reply.add(inode, (i + 1) as i64, file_type, file_name) {
                         break;
                     }
