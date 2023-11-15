@@ -6,9 +6,9 @@ use std::collections::BTreeMap;
 use std::env;
 use std::fs;
 use std::fs::DirEntry;
-use std::path::{Path, PathBuf};
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::prelude::*;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::{Duration, SystemTime};
 
@@ -37,7 +37,6 @@ impl Filesystem for GrpcFs {
     }
 
     fn getattr(&mut self, _req: &fuser::Request<'_>, inode: u64, reply: fuser::ReplyAttr) {
-        debug!("getattr");
         if let Some(path) = self.inode_map.get(&inode) {
             match fs::metadata(path) {
                 Ok(dentry_metadata) => {
@@ -66,7 +65,7 @@ impl Filesystem for GrpcFs {
                         debug!("unknown file type");
                         reply.error(ENOENT);
                     }
-                },
+                }
                 Err(_) => {
                     debug!("failed to get metadata of {}", path.display());
                     reply.error(ENOENT);
@@ -84,7 +83,6 @@ impl Filesystem for GrpcFs {
         name: &std::ffi::OsStr,
         reply: fuser::ReplyEntry,
     ) {
-        debug!("lookup");
         let default_duration = Duration::from_secs(1);
         let name = if let Some(parent_path) = self.inode_map.get(&parent) {
             Path::new(parent_path).join(name)
@@ -137,7 +135,6 @@ impl Filesystem for GrpcFs {
         offset: i64,
         mut reply: fuser::ReplyDirectory,
     ) {
-        debug!("readdir");
         if let Some(path) = self.inode_map.get(&inode) {
             let path = Path::new(path);
             if path.is_dir() {
@@ -150,9 +147,14 @@ impl Filesystem for GrpcFs {
                     }
                 };
 
-                let entries: Vec<DirEntry> =  dirs.filter(Result::is_ok).map(|ok| {ok.unwrap()}).collect();
+                let entries: Vec<DirEntry> =
+                    dirs.filter(Result::is_ok).map(|ok| ok.unwrap()).collect();
                 for (i, entry) in entries.iter().enumerate().skip(offset as usize) {
-                    let file_type = if entry.path().is_dir() {FileType::Directory} else {FileType::RegularFile};
+                    let file_type = if entry.path().is_dir() {
+                        FileType::Directory
+                    } else {
+                        FileType::RegularFile
+                    };
                     let file_name = entry.file_name();
                     let inode = entry.ino();
                     debug!("inode: {}, file_name: {:?}", inode, file_name);
