@@ -22,7 +22,7 @@ impl GrpcFs {
             inode_map: BTreeMap::new(),
         };
 
-        fs.inode_map.insert(0, PathBuf::from_str("/").unwrap());
+        fs.inode_map.insert(1, PathBuf::from_str("/").unwrap());
         fs
     }
 
