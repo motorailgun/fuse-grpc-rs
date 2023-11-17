@@ -2,15 +2,39 @@ syntax = "proto3";
 package rpc_fs;
 
 message GetAttrRequest {
-    string path = 1;
+    uint64 inode = 1;
+}
+
+enum FileType {
+    REGULAR = 0;
+    DIRECTORY = 1;
+}
+
+message Attr {
+    uint64 inode = 1;
+    uint64 size = 2;
+    uint64 blocks = 3;
+    FileType kind = 4;
+    uint32 permission = 5;
+    uint32 nlink = 6;
+    uint32 uid = 7;
+    uint32 gid = 8;
+    uint32 rdev = 9;
+    uint32 blksize = 10;
 }
 
 message GetAttrReply {
-    bytes stat_t = 1;
+    Attr attributes = 1;
 }
 
 message ReadDirRequest {
     string path = 1;
+}
+
+message DirEntries {
+    uint64 inode = 1;
+    string file_name = 2;
+    FileType kind = 3;
 }
 
 message ReadDirReply {
