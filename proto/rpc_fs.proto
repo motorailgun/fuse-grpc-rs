@@ -1,0 +1,44 @@
+syntax = "proto3";
+package rpc_fs;
+
+message GetAttrRequest {
+    string path = 1;
+}
+
+message GetAttrReply {
+    bytes stat_t = 1;
+}
+
+message ReadDirRequest {
+    string path = 1;
+}
+
+message ReadDirReply {
+    bytes dirents_t = 1;
+}
+
+message OpenRequest {
+    string path = 1;
+    int32 flags = 2;
+}
+
+message OpenReply {
+    int32 fd = 1;
+}
+
+message ReadRequest {
+    int32 fd = 1;
+    int64 size = 2;
+    uint64 offset = 3;
+}
+
+message ReadReply {
+    bytes data = 1;
+}
+
+service RpcFs {
+    rpc GetAttr (GetAttrRequest) returns (GetAttrReply);
+    rpc ReadDir (ReadDirRequest) returns (ReadDirReply);
+    rpc Open (OpenRequest) returns (OpenReply);
+    rpc Read (ReadRequest) returns (ReadReply);
+}
