@@ -11,3 +11,6 @@ fuser = "0.14.0"
 libc = "0.2.150"
 log = "0.4.20"
 tonic = "0.10.2"
+
+[build-dependencies]
+tonic-build = "0.10.2"
