@@ -1,3 +1,5 @@
+pub mod server;
+
 use fuser::FileType;
 use fuser::{Filesystem, MountOption};
 use libc::ENOENT;
