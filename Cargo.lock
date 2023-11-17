@@ -238,7 +238,6 @@ dependencies = [
  "libc",
  "log",
  "prost",
- "serde",
  "tokio",
  "tonic",
  "tonic-build",
