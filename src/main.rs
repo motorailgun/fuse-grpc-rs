@@ -207,14 +207,29 @@ impl Filesystem for GrpcFs {
     fn read(
         &mut self,
         _req: &fuser::Request<'_>,
-        _ino: u64,
+        inode: u64,
         _fh: u64,
-        _offset: i64,
-        _size: u32,
+        offset: i64,
+        size: u32,
         _flags: i32,
         _lock_owner: Option<u64>,
         reply: fuser::ReplyData,
     ) {
+        if let Some(path) = self.inode_map.get(&inode) {
+            if path.is_file() {
+                if let Ok(file) = fs::File::open(path) {
+                    let mut buffer = vec![0; size as usize];
+                    match file.read_at(&mut buffer, offset as u64) {
+                        Ok(_) => reply.data(&buffer),
+                        _ => {
+                            reply.error(ENOENT);
+                            return;
+                        },
+                    }
+                }
+                return;
+            }
+        }
         reply.error(ENOENT)
     }
 }
