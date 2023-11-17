@@ -119,7 +119,11 @@ impl Filesystem for GrpcFs {
                     flags: 0, // as I don't use this thing on macOS
                 };
 
-                debug!("insert: inode {}, path {}", dentry_metadata.ino(), name.display());
+                debug!(
+                    "insert: inode {}, path {}",
+                    dentry_metadata.ino(),
+                    name.display()
+                );
                 match self.append_inode(dentry_metadata.ino(), name) {
                     Err(err) => warn!("{}", err),
                     _ => (),
@@ -197,7 +201,7 @@ impl Filesystem for GrpcFs {
                 if path.is_file() {
                     reply.opened(0, flags as u32);
                 }
-            },
+            }
             None => {
                 reply.error(ENOENT);
             }
@@ -224,7 +228,7 @@ impl Filesystem for GrpcFs {
                         _ => {
                             reply.error(ENOENT);
                             return;
-                        },
+                        }
                     }
                 }
                 return;
