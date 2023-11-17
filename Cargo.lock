@@ -237,6 +237,7 @@ dependencies = [
  "fuser",
  "libc",
  "log",
+ "prost",
  "tonic",
  "tonic-build",
 ]
