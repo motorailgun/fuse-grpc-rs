@@ -2,7 +2,7 @@ syntax = "proto3";
 package rpc_fs;
 
 message GetAttrRequest {
-    uint64 inode = 1;
+    string path = 1;
 }
 
 enum FileType {
@@ -28,7 +28,7 @@ message GetAttrReply {
 }
 
 message ReadDirRequest {
-    uint64 inode = 1;
+    string path = 1;
     int64 offset = 2;
 }
 

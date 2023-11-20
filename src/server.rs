@@ -1,6 +1,4 @@
-use std::collections::BTreeMap;
 use std::path::{PathBuf, Path};
-use std::str::FromStr;
 use std::time::{Duration, SystemTime};
 use std::fs;
 use std::fs::DirEntry;
@@ -17,61 +15,42 @@ pub mod rpc_fs {
     tonic::include_proto!("rpc_fs");
 }
 
+// we do not want to keep inode-to-path translation table in server-side
+// as it requires too much work on handler side
+// instead, we do inode-to-path translation table in client-side,
+// and the path is sent over RPCs
 #[derive(Debug, Default)]
-pub struct GrpcFs {
-    inode_map: BTreeMap<u64, PathBuf>,
-}
-
-impl GrpcFs {
-    fn new() -> Self {
-        let mut fs = GrpcFs {
-            inode_map: BTreeMap::new(),
-        };
-
-        fs.inode_map.insert(1, PathBuf::from_str("/").unwrap());
-        fs
-    }
-
-    fn append_inode(&mut self, key: u64, path: PathBuf) -> Result<(), String> {
-        if key == 1 {
-            return Err("inode number 1 is reserved for root directory".to_string());
-        }
-        self.inode_map.insert(key, path);
-        Ok(())
-    }
-}
+pub struct GrpcFs {}
 
 #[tonic::async_trait]
 impl RpcFs for GrpcFs {
     async fn get_attr(&self, request: Request<GetAttrRequest>) -> Result<Response<GetAttrReply>, Status> {
-        let inode = request.into_inner().inode;
-        if let Some(path) = self.inode_map.get(&inode) {
-            match fs::metadata(path) {
-                Ok(dentry_metadata) => {
-                    let reply = |kind| GetAttrReply {
-                        attributes: Some(Attr {
-                            inode: dentry_metadata.ino(),
-                            size: dentry_metadata.size(),
-                            blocks: dentry_metadata.blocks(),
-                            kind: kind,
-                            permission: dentry_metadata.permissions().mode(),
-                            nlink: dentry_metadata.nlink() as u32,
-                            uid: dentry_metadata.uid(),
-                            gid: dentry_metadata.gid(),
-                            rdev: dentry_metadata.rdev() as u32,
-                            blksize: dentry_metadata.blksize() as u32,
-                        })
-                    };
+        let path = request.into_inner().path;
+        match fs::metadata(&path) {
+            Ok(dentry_metadata) => {
+                let reply = |kind| GetAttrReply {
+                    attributes: Some(Attr {
+                        inode: dentry_metadata.ino(),
+                        size: dentry_metadata.size(),
+                        blocks: dentry_metadata.blocks(),
+                        kind: kind,
+                        permission: dentry_metadata.permissions().mode(),
+                        nlink: dentry_metadata.nlink() as u32,
+                        uid: dentry_metadata.uid(),
+                        gid: dentry_metadata.gid(),
+                        rdev: dentry_metadata.rdev() as u32,
+                        blksize: dentry_metadata.blksize() as u32,
+                    })
+                };
 
-                    return Ok(Response::new(if dentry_metadata.is_dir() {
-                        reply(FileType::Directory.into())
-                    } else {
-                        reply(FileType::Regular.into())
-                    }));
-                }
-                Err(_) => {
-                    debug!("failed to get metadata of {}", path.display());
-                }
+                return Ok(Response::new(if dentry_metadata.is_dir() {
+                    reply(FileType::Directory.into())
+                } else {
+                    reply(FileType::Regular.into())
+                }));
+            }
+            Err(_) => {
+                debug!("failed to get metadata of {}", path);
             }
         }
 
@@ -80,50 +59,48 @@ impl RpcFs for GrpcFs {
 
     async fn read_dir(&self, request: Request<ReadDirRequest>) -> Result<Response<ReadDirReply>, Status> {
         let ReadDirRequest {
-            inode, offset
+            path, offset
         } = request.into_inner();
 
-        if let Some(path) = self.inode_map.get(&inode) {
-            let path = Path::new(path);
-            if path.is_dir() {
-                let dirs = match fs::read_dir(path) {
-                    Ok(dir) => dir,
-                    Err(_) => {
-                        let msg = format!("failed to read directory {}", path.display());
-                        debug!("{}", msg);
-                        return Err(Status::new(tonic::Code::Internal, msg));
+        
+        let path = Path::new(&path);
+        if path.is_dir() {
+            let dirs = match fs::read_dir(path) {
+                Ok(dir) => dir,
+                Err(_) => {
+                    let msg = format!("failed to read directory {}", path.display());
+                    debug!("{}", msg);
+                    return Err(Status::new(tonic::Code::Internal, msg));
+                }
+            };
+
+            let entries: Vec<DEntry> =
+                dirs
+                    .filter_map(|e| e.ok())
+                    .skip(offset as usize)
+                    .enumerate()
+                    .map(|(offset, entry)| {
+                        let kind = if entry.path().is_dir() {
+                            FileType::Directory
+                        } else {
+                            FileType::Regular
+                        };
+
+                        let file_name = entry.file_name().into_string().unwrap();
+                        let inode = entry.ino();
+                        debug!("inode: {}, file_name: {:?}", inode, file_name);
+                    
+                    rpc_fs::DEntry {
+                        inode,
+                        offset: offset as u64,
+                        file_name,
+                        kind: kind.into(),
                     }
-                };
+                }).collect();
 
-                let entries: Vec<DEntry> =
-                    dirs
-                        .filter_map(|e| e.ok())
-                        .skip(offset as usize)
-                        .enumerate()
-                        .map(|(offset, entry)| {
-                            let kind = if entry.path().is_dir() {
-                                FileType::Directory
-                            } else {
-                                FileType::Regular
-                            };
-                            let file_name = entry.file_name().into_string().unwrap();
-                            let inode = entry.ino();
-                            debug!("inode: {}, file_name: {:?}", inode, file_name);
-
-                            debug!("insert: inode {}, path {}", inode, entry.path().display());
-                            match self.append_inode(inode, entry.path()) {
-                                Err(err) => warn!("{}", err),
-                                _ => (),
-                            }
-                        
-                        rpc_fs::DEntry {
-                            inode,
-                            offset: offset as u64,
-                            file_name,
-                            kind: kind.into(),
-                        }
-                    }).collect();
-            }
+                return Ok(Response::new(ReadDirReply {
+                    entries
+                }))
         }
         Err(Status::new(tonic::Code::NotFound, "not found"))
     }
