@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 use std::str::FromStr;
 use std::time::{Duration, SystemTime};
 use std::fs;
@@ -79,7 +79,52 @@ impl RpcFs for GrpcFs {
     }
 
     async fn read_dir(&self, request: Request<ReadDirRequest>) -> Result<Response<ReadDirReply>, Status> {
-        let request = request.into_inner();
+        let ReadDirRequest {
+            inode, offset
+        } = request.into_inner();
+
+        if let Some(path) = self.inode_map.get(&inode) {
+            let path = Path::new(path);
+            if path.is_dir() {
+                let dirs = match fs::read_dir(path) {
+                    Ok(dir) => dir,
+                    Err(_) => {
+                        let msg = format!("failed to read directory {}", path.display());
+                        debug!("{}", msg);
+                        return Err(Status::new(tonic::Code::Internal, msg));
+                    }
+                };
+
+                let entries: Vec<DEntry> =
+                    dirs
+                        .filter_map(|e| e.ok())
+                        .skip(offset as usize)
+                        .enumerate()
+                        .map(|(offset, entry)| {
+                            let kind = if entry.path().is_dir() {
+                                FileType::Directory
+                            } else {
+                                FileType::Regular
+                            };
+                            let file_name = entry.file_name().into_string().unwrap();
+                            let inode = entry.ino();
+                            debug!("inode: {}, file_name: {:?}", inode, file_name);
+
+                            debug!("insert: inode {}, path {}", inode, entry.path().display());
+                            match self.append_inode(inode, entry.path()) {
+                                Err(err) => warn!("{}", err),
+                                _ => (),
+                            }
+                        
+                        rpc_fs::DEntry {
+                            inode,
+                            offset: offset as u64,
+                            file_name,
+                            kind: kind.into(),
+                        }
+                    }).collect();
+            }
+        }
         Err(Status::new(tonic::Code::NotFound, "not found"))
     }
         

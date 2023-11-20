@@ -28,17 +28,19 @@ message GetAttrReply {
 }
 
 message ReadDirRequest {
-    string path = 1;
+    uint64 inode = 1;
+    int64 offset = 2;
 }
 
-message DirEntries {
+message DEntry {
     uint64 inode = 1;
-    string file_name = 2;
-    FileType kind = 3;
+    uint64 offset = 2;
+    string file_name = 3;
+    FileType kind = 4;
 }
 
 message ReadDirReply {
-    bytes dirents_t = 1;
+    repeated DEntry entries = 1;
 }
 
 message OpenRequest {
