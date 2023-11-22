@@ -1,14 +1,12 @@
-use std::path::{PathBuf, Path};
-use std::time::{Duration, SystemTime};
+use std::path::Path;
 use std::fs;
-use std::fs::DirEntry;
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::prelude::*;
 use log::*;
 
-use tonic::{transport::Server, Request, Response, Status};
+use tonic::{Request, Response, Status};
 
-use rpc_fs::rpc_fs_server::{RpcFs, RpcFsServer};
+use rpc_fs::rpc_fs_server::RpcFs;
 use rpc_fs::*;
 
 pub mod rpc_fs {
@@ -106,12 +104,34 @@ impl RpcFs for GrpcFs {
     }
         
     async fn open(&self, request: Request<OpenRequest>) -> Result<Response<OpenReply>, Status> {
-        let request = request.into_inner();
+        let OpenRequest{path, ..} = request.into_inner();
+        let path = Path::new(&path);
+        if path.exists() {
+            return Ok(Response::new(OpenReply {
+                fd: 0,
+            }))
+        }
         Err(Status::new(tonic::Code::NotFound, "not found"))
     }
 
     async fn read(&self, request: Request<ReadRequest>) -> Result<Response<ReadReply>, Status> {
-        let request = request.into_inner();
+        let ReadRequest{path, offset, size} = request.into_inner();
+        let path = Path::new(&path);
+
+        if path.is_file() {
+            if let Ok(file) = fs::File::open(path) {
+                let mut buffer = vec![0; size as usize];
+                match file.read_at(&mut buffer, offset as u64) {
+                    Ok(_) => {
+                        return Ok(Response::new(ReadReply {
+                            data: buffer,
+                        }))
+                    },
+                    _ => (),
+                }
+            }
+        }
+
         Err(Status::new(tonic::Code::NotFound, "not found"))
     }
 }
