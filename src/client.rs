@@ -31,6 +31,7 @@ impl GrpcFsClient {
     fn append_inode(&mut self, inode: u64, path: PathBuf) {
         if inode == 1 {
             warn!("inode number 1 is reserved: path \"{}\"", path.display());
+            return;
         }
         self.inode_map.insert(inode, path);
     }
@@ -100,6 +101,62 @@ impl Filesystem for GrpcFsClient{
                 }
                 Err(e) => {
                     warn!("failed to get attributes of {}: {}", path.display(), e);
+                    reply.error(libc::ENOENT);
+                }
+            }
+        }
+    }
+
+    fn lookup(&mut self, _req: &fuser::Request<'_>, parent: u64, name: &std::ffi::OsStr, reply: fuser::ReplyEntry) {
+        if let Some(parent_path) = self.inode_map.get(&parent) {
+            let path = parent_path.join(name);
+            let client = self.client.as_mut().unwrap();
+            let request = tonic::Request::new(GetAttrRequest {
+                path: path.to_str().unwrap().to_string(),
+            });
+
+            let response = executor::block_on(client.get_attr(request));
+            match response {
+                Ok(response) => {
+                    let attr = response.into_inner().attributes.unwrap();
+                    let inode = attr.inode;
+                    let kind = attr.kind;
+                    let perm = attr.permission;
+                    let nlink = attr.nlink;
+                    let uid = attr.uid;
+                    let gid = attr.gid;
+                    let size = attr.size;
+                    let blksize = attr.blksize;
+                    let blocks = attr.blocks;
+                    let rdev = attr.rdev;
+                    
+                    self.append_inode(inode, path);
+                    reply.entry(&Duration::new(1, 0), &fuser::FileAttr {
+                        ino: inode,
+                        size,
+                        blocks,
+                        atime: SystemTime::UNIX_EPOCH,
+                        mtime: SystemTime::UNIX_EPOCH,
+                        ctime: SystemTime::UNIX_EPOCH,
+                        crtime: SystemTime::UNIX_EPOCH + Duration::from_secs(0),
+                        kind: if kind == FileType::Directory.into() {
+                            fuser::FileType::Directory
+                        } else {
+                            fuser::FileType::RegularFile
+                        },
+                        perm: perm as u16,
+                        nlink,
+                        uid,
+                        gid,
+                        rdev,
+                        blksize,
+                        flags: 0,
+                    }, 0);
+                    return;
+                }
+                Err(_e) => {
+                    // TODO: check if this is just 404, or other errors
+                    info!("lookup: not found for path: {}", path.display());
                     reply.error(libc::ENOENT);
                 }
             }

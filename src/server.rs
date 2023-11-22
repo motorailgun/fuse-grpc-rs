@@ -56,6 +56,40 @@ impl RpcFs for GrpcFs {
         Err(Status::new(tonic::Code::NotFound, "not found"))
     }
 
+    async fn look_up(&self, request: Request<LookUpRequest>) -> Result<Response<LookUpReply>, Status> {
+        debug!("grpc: lookup");
+        let path = request.into_inner().path;
+        match fs::metadata(&path) {
+            Ok(dentry_metadata) => {
+                let reply = |kind| LookUpReply {
+                    attributes: Some(Attr {
+                        inode: dentry_metadata.ino(),
+                        size: dentry_metadata.size(),
+                        blocks: dentry_metadata.blocks(),
+                        kind: kind,
+                        permission: dentry_metadata.permissions().mode(),
+                        nlink: dentry_metadata.nlink() as u32,
+                        uid: dentry_metadata.uid(),
+                        gid: dentry_metadata.gid(),
+                        rdev: dentry_metadata.rdev() as u32,
+                        blksize: dentry_metadata.blksize() as u32,
+                    })
+                };
+
+                return Ok(Response::new(if dentry_metadata.is_dir() {
+                    reply(FileType::Directory.into())
+                } else {
+                    reply(FileType::Regular.into())
+                }));
+            }
+            Err(_) => {
+                debug!("failed to get metadata of {}", path);
+            }
+        }
+
+        Err(Status::new(tonic::Code::NotFound, "not found"))
+    }
+
     async fn read_dir(&self, request: Request<ReadDirRequest>) -> Result<Response<ReadDirReply>, Status> {
         debug!("grpc: read_dir");
         let ReadDirRequest {
