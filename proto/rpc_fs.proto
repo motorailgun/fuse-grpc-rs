@@ -53,7 +53,7 @@ message OpenReply {
 }
 
 message ReadRequest {
-    int32 fd = 1;
+    string path = 1;
     int64 size = 2;
     uint64 offset = 3;
 }
