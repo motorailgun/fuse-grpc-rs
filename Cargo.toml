@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 env_logger = "0.10.0"
 fuser = "0.14.0"
+futures = "0.3.29"
 libc = "0.2.150"
 log = "0.4.20"
 prost = "0.12.2"
