@@ -23,6 +23,7 @@ pub struct GrpcFs {}
 #[tonic::async_trait]
 impl RpcFs for GrpcFs {
     async fn get_attr(&self, request: Request<GetAttrRequest>) -> Result<Response<GetAttrReply>, Status> {
+        debug!("grpc: get_attr");
         let path = request.into_inner().path;
         match fs::metadata(&path) {
             Ok(dentry_metadata) => {
@@ -56,6 +57,7 @@ impl RpcFs for GrpcFs {
     }
 
     async fn read_dir(&self, request: Request<ReadDirRequest>) -> Result<Response<ReadDirReply>, Status> {
+        debug!("grpc: read_dir");
         let ReadDirRequest {
             path, offset
         } = request.into_inner();
@@ -77,7 +79,7 @@ impl RpcFs for GrpcFs {
                     .filter_map(|e| e.ok())
                     .skip(offset as usize)
                     .enumerate()
-                    .map(|(offset, entry)| {
+                    .map(|(idx, entry)| {
                         let kind = if entry.path().is_dir() {
                             FileType::Directory
                         } else {
@@ -90,20 +92,21 @@ impl RpcFs for GrpcFs {
                     
                     rpc_fs::DEntry {
                         inode,
-                        offset: offset as u64,
+                        offset: idx as u64 + 1,
                         file_name,
                         kind: kind.into(),
                     }
                 }).collect();
 
-                return Ok(Response::new(ReadDirReply {
-                    entries
-                }))
+            return Ok(Response::new(ReadDirReply {
+                entries
+            }))
         }
         Err(Status::new(tonic::Code::NotFound, "not found"))
     }
         
     async fn open(&self, request: Request<OpenRequest>) -> Result<Response<OpenReply>, Status> {
+        debug!("grpc: open");
         let OpenRequest{path, ..} = request.into_inner();
         let path = Path::new(&path);
         if path.exists() {
@@ -115,6 +118,7 @@ impl RpcFs for GrpcFs {
     }
 
     async fn read(&self, request: Request<ReadRequest>) -> Result<Response<ReadReply>, Status> {
+        debug!("grpc: read");
         let ReadRequest{path, offset, size} = request.into_inner();
         let path = Path::new(&path);
 
