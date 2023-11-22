@@ -34,7 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .await?;
             }
             "client" => {
-                let addr = "[::1]:50051".parse()?;
+                let addr = String::from("http://[::1]:50051");
                 let mountpoint = String::from("/tmp/mnt");
                 let options = vec![MountOption::RO, MountOption::FSName("GrpcFs".to_string())];
                 fuser::mount2(GrpcFsClient::new(addr), mountpoint, &options)?;
