@@ -50,7 +50,7 @@ impl Filesystem for GrpcFsClient{
                 self.client = Some(cl);
                 return Ok(());
             }
-            Err(e) => error!("failed to connect to server: {}", e),
+            Err(e) => panic!("failed to connect to server: {}", e),
         }
         Err(libc::EIO)
     }
