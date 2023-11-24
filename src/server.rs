@@ -138,7 +138,71 @@ impl RpcFs for GrpcFs {
         }
         Err(Status::new(tonic::Code::NotFound, "not found"))
     }
+
+    async fn read_dir_plus(&self, request: Request<ReadDirRequest>) -> Result<Response<ReadDirPlusReply>, Status> {
+        debug!("grpc: read_dir_plus");
+        let ReadDirRequest {
+            path, offset
+        } = request.into_inner();
+
         
+        let path = Path::new(&path);
+        if path.is_dir() {
+            let dirs = match fs::read_dir(path) {
+                Ok(dir) => dir,
+                Err(_) => {
+                    let msg = format!("failed to read directory {}", path.display());
+                    debug!("{}", msg);
+                    return Err(Status::new(tonic::Code::Internal, msg));
+                }
+            };
+
+            let entries: Vec<DEntryPlus> =
+                dirs
+                    .filter_map(|e| e.ok())
+                    .skip(offset as usize)
+                    .enumerate()
+                    .map(|(idx, entry)| {
+                        let kind = if entry.path().is_dir() {
+                            FileType::Directory
+                        } else {
+                            FileType::Regular
+                        };
+
+                        let file_name = entry.file_name().into_string().unwrap();
+                        let inode = entry.ino();
+                        debug!("inode: {}, file_name: {:?}", inode, file_name);
+
+                        let dentry_metadata = fs::metadata(path.join(&file_name)).unwrap();
+                        let attrs = rpc_fs::Attr {
+                            inode: dentry_metadata.ino(),
+                            size: dentry_metadata.size(),
+                            blocks: dentry_metadata.blocks(),
+                            kind: kind.into(),
+                            permission: dentry_metadata.permissions().mode(),
+                            nlink: dentry_metadata.nlink() as u32,
+                            uid: dentry_metadata.uid(),
+                            gid: dentry_metadata.gid(),
+                            rdev: dentry_metadata.rdev() as u32,
+                            blksize: dentry_metadata.blksize() as u32,
+                        };
+                        
+                        rpc_fs::DEntryPlus {
+                            inode,
+                            offset: idx as u64 + 1,
+                            name: file_name,
+                            kind: kind.into(),
+                            attr: Some(attrs),
+                        }
+                    }).collect();
+
+            return Ok(Response::new(ReadDirPlusReply {
+                entries
+            }))
+        }
+        Err(Status::new(tonic::Code::NotFound, "not found"))
+    }
+    
     async fn open(&self, request: Request<OpenRequest>) -> Result<Response<OpenReply>, Status> {
         debug!("grpc: open");
         let OpenRequest{path, ..} = request.into_inner();

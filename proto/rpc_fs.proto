@@ -51,9 +51,21 @@ message ReadDirReply {
     repeated DEntry entries = 1;
 }
 
+message DEntryPlus {
+    uint64 inode = 1;
+    uint64 offset = 2;
+    string name = 3;
+    FileType kind = 4;
+    Attr attr = 5;
+}
+
+message ReadDirPlusReply {
+    repeated DEntryPlus entries = 1;
+}
+
 message OpenRequest {
     string path = 1;
-    int32 flags = 2;
+    uint32 flags = 2;
 }
 
 message OpenReply {
@@ -74,6 +86,7 @@ service RpcFs {
     rpc GetAttr (GetAttrRequest) returns (GetAttrReply);
     rpc LookUp (LookUpRequest) returns (LookUpReply);
     rpc ReadDir (ReadDirRequest) returns (ReadDirReply);
+    rpc ReadDirPlus (ReadDirRequest) returns (ReadDirPlusReply);
     rpc Open (OpenRequest) returns (OpenReply);
     rpc Read (ReadRequest) returns (ReadReply);
 }

@@ -6,8 +6,8 @@ use server::GrpcFs;
 use server::rpc_fs::rpc_fs_server::RpcFsServer;
 use tonic::transport::Server;
 
-use fuser:: MountOption;
-
+use fuse3::MountOptions;
+use fuse3::raw::prelude::*;
 
 fn usage(exe_name: &str) {
     println!("usage: {exe_name} [subcommand] <options...>");
@@ -36,8 +36,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "client" => {
                 let addr = String::from("http://[::1]:50051");
                 let mountpoint = String::from("/tmp/mnt");
-                let options = vec![MountOption::RO, MountOption::FSName("GrpcFs".to_string())];
-                fuser::mount2(GrpcFsClient::new(addr), mountpoint, &options)?;
+                let mut options = MountOptions::default();
+                options.read_only(true).fs_name("GrpcFs"); //force_readdir_plus(true);
+                Session::new(options)
+                    .mount_with_unprivileged(GrpcFsClient::new(addr).await, mountpoint)
+                    .await?.await?;
             }
             _ => {
                 usage(&args[0]);
