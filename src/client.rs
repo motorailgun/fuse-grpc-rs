@@ -83,9 +83,7 @@ impl Filesystem for GrpcFsClient {
         debug!("getattr: inode {}", inode);
         if let Some(path) = self.get_path(inode).await {
             let mut client = self.client.clone();
-            let request = tonic::Request::new(GetAttrRequest {
-                path: path.clone(),
-            });
+            let request = tonic::Request::new(GetAttrRequest { path: path.clone() });
 
             let response = client.get_attr(request).await;
             match response {
@@ -239,7 +237,10 @@ impl Filesystem for GrpcFsClient {
                             } else {
                                 inode
                             };
-                            futures::executor::block_on(self.append_inode(inode, Path::new(&path).join(&name).to_str().unwrap().to_string()));
+                            futures::executor::block_on(self.append_inode(
+                                inode,
+                                Path::new(&path).join(&name).to_str().unwrap().to_string(),
+                            ));
 
                             Ok(DirectoryEntry {
                                 inode,
@@ -311,7 +312,10 @@ impl Filesystem for GrpcFsClient {
                             } else {
                                 inode
                             };
-                            futures::executor::block_on(self.append_inode(inode, Path::new(&path).join(&name).to_str().unwrap().to_string()));
+                            futures::executor::block_on(self.append_inode(
+                                inode,
+                                Path::new(&path).join(&name).to_str().unwrap().to_string(),
+                            ));
 
                             Ok(DirectoryEntryPlus {
                                 inode,
