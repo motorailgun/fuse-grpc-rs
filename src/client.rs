@@ -8,7 +8,7 @@ use rpc_fs::rpc_fs_client::RpcFsClient;
 use rpc_fs::*;
 use std::collections::BTreeMap;
 use std::iter::Skip;
-use std::path::PathBuf;
+use std::path::Path;
 use std::time::{Duration, SystemTime};
 use std::vec::IntoIter;
 use tokio::sync::RwLock;
@@ -18,7 +18,7 @@ pub mod rpc_fs {
 }
 
 pub struct GrpcFsClient {
-    inode_map: RwLock<BTreeMap<u64, PathBuf>>,
+    inode_map: RwLock<BTreeMap<u64, String>>,
     #[allow(dead_code)]
     address: String,
     client: RpcFsClient<tonic::transport::Channel>,
@@ -39,21 +39,21 @@ impl GrpcFsClient {
             address,
             client: client.unwrap(),
         };
-        c.inode_map.write().await.insert(1, PathBuf::from("/"));
+        c.inode_map.write().await.insert(1, String::from("/"));
 
         c
     }
 
-    async fn append_inode(&self, inode: u64, path: PathBuf) {
+    async fn append_inode(&self, inode: u64, path: String) {
         if inode == 1 {
-            warn!("inode number 1 is reserved: path \"{}\"", path.display());
+            warn!("inode number 1 is reserved: path \"{}\"", path);
             return;
         }
-        debug!("caching: inode #{}, path = {}", inode, path.display());
+        debug!("caching: inode #{}, path = {}", inode, path);
         self.inode_map.write().await.insert(inode, path);
     }
 
-    async fn get_path(&self, inode: u64) -> Option<PathBuf> {
+    async fn get_path(&self, inode: u64) -> Option<String> {
         if let Some(path) = self.inode_map.read().await.get(&inode) {
             return Some(path.clone());
         }
@@ -84,7 +84,7 @@ impl Filesystem for GrpcFsClient {
         if let Some(path) = self.get_path(inode).await {
             let mut client = self.client.clone();
             let request = tonic::Request::new(GetAttrRequest {
-                path: path.to_str().unwrap().to_string(),
+                path: path.clone(),
             });
 
             let response = client.get_attr(request).await;
@@ -128,7 +128,7 @@ impl Filesystem for GrpcFsClient {
                     });
                 }
                 Err(e) => {
-                    warn!("failed to get attributes of {}: {}", path.display(), e);
+                    warn!("failed to get attributes of {}: {}", path, e);
                 }
             }
         }
@@ -147,7 +147,7 @@ impl Filesystem for GrpcFsClient {
             name.to_str().unwrap().to_string()
         );
         if let Some(parent_path) = self.get_path(parent).await {
-            let path = parent_path.join(name);
+            let path = Path::new(&parent_path).join(name);
             let mut client = self.client.clone();
             let request = tonic::Request::new(GetAttrRequest {
                 path: path.to_str().unwrap().to_string(),
@@ -215,7 +215,7 @@ impl Filesystem for GrpcFsClient {
             // let path = path.clone();
             let mut client = self.client.clone();
             let request = tonic::Request::new(ReadDirRequest {
-                path: path.to_str().unwrap().to_string(),
+                path: path.clone(),
                 offset,
             });
 
@@ -239,7 +239,7 @@ impl Filesystem for GrpcFsClient {
                             } else {
                                 inode
                             };
-                            futures::executor::block_on(self.append_inode(inode, path.join(&name)));
+                            futures::executor::block_on(self.append_inode(inode, Path::new(&path).join(&name).to_str().unwrap().to_string()));
 
                             Ok(DirectoryEntry {
                                 inode,
@@ -260,7 +260,7 @@ impl Filesystem for GrpcFsClient {
                     })
                 }
                 Err(e) => {
-                    warn!("failed to read directory {}: {}", path.display(), e);
+                    warn!("failed to read directory {}: {}", path, e);
                     Err(libc::ENOENT.into())
                 }
             }
@@ -281,7 +281,7 @@ impl Filesystem for GrpcFsClient {
         if let Some(path) = self.get_path(parent).await {
             let mut client = self.client.clone();
             let request = tonic::Request::new(ReadDirRequest {
-                path: path.to_str().unwrap().to_string(),
+                path: path.clone(),
                 offset: offset.try_into().unwrap(), // blame if someone put minus-value into offset
             });
 
@@ -301,7 +301,7 @@ impl Filesystem for GrpcFsClient {
                                 attr,
                             } = entry;
 
-                            if attr == None {
+                            if attr.is_none() {
                                 warn!("empty attr on readdirplus!");
                                 return Err(libc::ENOENT.into());
                             }
@@ -311,7 +311,7 @@ impl Filesystem for GrpcFsClient {
                             } else {
                                 inode
                             };
-                            futures::executor::block_on(self.append_inode(inode, path.join(&name)));
+                            futures::executor::block_on(self.append_inode(inode, Path::new(&path).join(&name).to_str().unwrap().to_string()));
 
                             Ok(DirectoryEntryPlus {
                                 inode,
@@ -370,7 +370,7 @@ impl Filesystem for GrpcFsClient {
             Some(path) => {
                 let mut client = self.client.clone();
                 let request = tonic::Request::new(OpenRequest {
-                    path: path.to_str().unwrap().to_string(),
+                    path: path.clone(),
                     flags,
                 });
                 let response = client.open(request).await;
@@ -383,7 +383,7 @@ impl Filesystem for GrpcFsClient {
                         })
                     }
                     Err(e) => {
-                        warn!("failed to open {}: {}", path.display(), e);
+                        warn!("failed to open {}: {}", path, e);
                         Err(libc::ENOENT.into())
                     }
                 }
@@ -404,8 +404,8 @@ impl Filesystem for GrpcFsClient {
         if let Some(path) = self.get_path(ino).await {
             let mut client = self.client.clone();
             let request = tonic::Request::new(ReadRequest {
-                path: path.to_str().unwrap().to_string(),
-                offset: offset.try_into().unwrap(),
+                path: path.clone(),
+                offset,
                 size: size.into(),
             });
             let response = client.read(request).await;
@@ -417,7 +417,7 @@ impl Filesystem for GrpcFsClient {
                     })
                 }
                 Err(e) => {
-                    warn!("failed to read {}: {}", path.display(), e);
+                    warn!("failed to read {}: {}", path, e);
                     Err(libc::ENOENT.into())
                 }
             }
