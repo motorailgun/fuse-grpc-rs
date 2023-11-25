@@ -125,7 +125,7 @@ impl RpcFs for GrpcFs {
                         FileType::Regular
                     };
 
-                    let file_name = entry.file_name().into_string().unwrap();
+                    let file_name = (*entry.file_name().to_string_lossy()).to_string();
                     let inode = entry.ino();
                     debug!("inode: {}, file_name: {:?}", inode, file_name);
 
@@ -172,7 +172,7 @@ impl RpcFs for GrpcFs {
                         FileType::Regular
                     };
 
-                    let file_name = entry.file_name().into_string().unwrap();
+                    let file_name = (*entry.file_name().to_string_lossy()).to_string();
                     let inode = entry.ino();
                     debug!("inode: {}, file_name: {:?}", inode, file_name);
 
