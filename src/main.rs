@@ -11,7 +11,7 @@ use fuse3::MountOptions;
 
 fn usage(exe_name: &str) {
     println!("usage: {exe_name} [subcommand] <options...>");
-    println!("");
+    println!();
     println!("subcommands:");
     println!("    server");
     println!("    client");
