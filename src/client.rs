@@ -159,7 +159,7 @@ impl Filesystem for GrpcFsClient{
                             ttl: Duration::from_secs(1),
                             attr: FileAttr {
                                 ino: inode,
-                                generation: 1,
+                                generation: 0,
                                 size,
                                 blocks,
                                 atime: SystemTime::UNIX_EPOCH.into(),
@@ -177,7 +177,7 @@ impl Filesystem for GrpcFsClient{
                                 rdev,
                                 blksize,
                             },
-                            generation: 1,
+                            generation: 0,
                         }
                     ));
                 }
@@ -277,12 +277,12 @@ impl Filesystem for GrpcFsClient{
                                 fuse3::FileType::RegularFile
                             }},
                             name: name.into(),
-                            generation: 1,
+                            generation: 0,
                             entry_ttl: Duration::from_secs(1),
                             attr_ttl: Duration::from_secs(1),
                             attr: FileAttr {
                                 ino: inode,
-                                generation: 1,
+                                generation: 0,
                                 size: attr.size,
                                 blocks: attr.blocks,
                                 atime: SystemTime::UNIX_EPOCH.into(),
