@@ -154,7 +154,7 @@ impl Filesystem for GrpcFsClient{
                     let blocks = attr.blocks;
                     let rdev = attr.rdev;
                     
-                    return dbg!(Ok(
+                    return Ok(
                         ReplyEntry {
                             ttl: Duration::from_secs(1),
                             attr: FileAttr {
@@ -179,7 +179,7 @@ impl Filesystem for GrpcFsClient{
                             },
                             generation: 0,
                         }
-                    ));
+                    );
                 }
                 Err(_e) => {
                     // TODO: check if this is just 404, or other errors
