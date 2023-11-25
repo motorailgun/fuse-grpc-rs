@@ -90,16 +90,18 @@ impl Filesystem for GrpcFsClient {
             let response = client.get_attr(request).await;
             match response {
                 Ok(response) => {
-                    let attr = response.into_inner().attributes.unwrap();
-                    let kind = attr.kind;
-                    let perm = attr.permission;
-                    let nlink = attr.nlink;
-                    let uid = attr.uid;
-                    let gid = attr.gid;
-                    let size = attr.size;
-                    let blksize = attr.blksize;
-                    let blocks = attr.blocks;
-                    let rdev = attr.rdev;
+                    let Attr {
+                        kind,
+                        permission,
+                        nlink,
+                        uid,
+                        gid,
+                        size,
+                        blksize,
+                        blocks,
+                        rdev,
+                        ..
+                    } = response.into_inner().attributes.unwrap();
 
                     return Ok(ReplyAttr {
                         ttl: Duration::from_secs(1),
@@ -116,7 +118,7 @@ impl Filesystem for GrpcFsClient {
                             } else {
                                 fuse3::FileType::RegularFile
                             },
-                            perm: perm as u16,
+                            perm: permission as u16,
                             nlink,
                             uid,
                             gid,
@@ -154,17 +156,18 @@ impl Filesystem for GrpcFsClient {
             let response = client.get_attr(request).await;
             match response {
                 Ok(response) => {
-                    let attr = response.into_inner().attributes.unwrap();
-                    let inode = attr.inode;
-                    let kind = attr.kind;
-                    let perm = attr.permission;
-                    let nlink = attr.nlink;
-                    let uid = attr.uid;
-                    let gid = attr.gid;
-                    let size = attr.size;
-                    let blksize = attr.blksize;
-                    let blocks = attr.blocks;
-                    let rdev = attr.rdev;
+                    let Attr {
+                        inode,
+                        kind,
+                        permission,
+                        nlink,
+                        uid,
+                        gid,
+                        size,
+                        blksize,
+                        blocks,
+                        rdev,
+                    } = response.into_inner().attributes.unwrap();
 
                     return Ok(ReplyEntry {
                         ttl: Duration::from_secs(1),
@@ -181,7 +184,7 @@ impl Filesystem for GrpcFsClient {
                             } else {
                                 fuse3::FileType::RegularFile
                             },
-                            perm: perm as u16,
+                            perm: permission as u16,
                             nlink,
                             uid,
                             gid,
