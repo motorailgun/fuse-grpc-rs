@@ -223,7 +223,7 @@ impl RpcFs for GrpcFs {
         if path.is_file() {
             if let Ok(file) = fs::File::open(path) {
                 let mut buffer = vec![0; size as usize];
-                if let Ok(_) = file.read_at(&mut buffer, offset) {
+                if file.read_at(&mut buffer, offset).is_ok() {
                     return Ok(Response::new(ReadReply { data: buffer }));
                 }
             }
