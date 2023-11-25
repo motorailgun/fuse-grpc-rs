@@ -35,7 +35,7 @@ impl RpcFs for GrpcFs {
                         inode: dentry_metadata.ino(),
                         size: dentry_metadata.size(),
                         blocks: dentry_metadata.blocks(),
-                        kind: kind,
+                        kind,
                         permission: dentry_metadata.permissions().mode(),
                         nlink: dentry_metadata.nlink() as u32,
                         uid: dentry_metadata.uid(),
@@ -72,7 +72,7 @@ impl RpcFs for GrpcFs {
                         inode: dentry_metadata.ino(),
                         size: dentry_metadata.size(),
                         blocks: dentry_metadata.blocks(),
-                        kind: kind,
+                        kind,
                         permission: dentry_metadata.permissions().mode(),
                         nlink: dentry_metadata.nlink() as u32,
                         uid: dentry_metadata.uid(),
@@ -223,7 +223,7 @@ impl RpcFs for GrpcFs {
         if path.is_file() {
             if let Ok(file) = fs::File::open(path) {
                 let mut buffer = vec![0; size as usize];
-                match file.read_at(&mut buffer, offset as u64) {
+                match file.read_at(&mut buffer, offset) {
                     Ok(_) => return Ok(Response::new(ReadReply { data: buffer })),
                     _ => (),
                 }
