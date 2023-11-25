@@ -87,7 +87,7 @@ impl Filesystem for GrpcFsClient{
                 Ok(response) => {
                     let attr = response.into_inner().attributes.unwrap();
                     let kind = attr.kind;
-                    let perm = 0o600; // attr.permission;
+                    let perm = attr.permission;
                     let nlink = attr.nlink;
                     let uid = attr.uid;
                     let gid = attr.gid;
@@ -101,7 +101,7 @@ impl Filesystem for GrpcFsClient{
                             ttl: Duration::from_secs(1),
                             attr: FileAttr {
                                 ino: inode,
-                                generation: 1,
+                                generation: 0,
                                 size,
                                 blocks,
                                 atime: SystemTime::UNIX_EPOCH.into(),
@@ -112,7 +112,7 @@ impl Filesystem for GrpcFsClient{
                                 } else {
                                     fuse3::FileType::RegularFile
                                 },
-                                perm: 0o600, // perm as u16,
+                                perm: perm as u16,
                                 nlink,
                                 uid,
                                 gid,
@@ -131,7 +131,7 @@ impl Filesystem for GrpcFsClient{
     }
 
     async fn lookup(&self, _req: Request, parent: u64, name: &std::ffi::OsStr) -> Result<ReplyEntry> {
-        debug!("lookup: parent {}, name {}", parent, name.to_string_lossy());
+        debug!("lookup: parent {}, name {}", parent, name.to_str().unwrap().to_string());
         if let Some(parent_path) = self.get_path(parent).await {
             let path = parent_path.join(name);
             let mut client = self.client.clone().unwrap();
@@ -145,7 +145,7 @@ impl Filesystem for GrpcFsClient{
                     let attr = response.into_inner().attributes.unwrap();
                     let inode = attr.inode;
                     let kind = attr.kind;
-                    let perm = 0o600;
+                    let perm = attr.permission;
                     let nlink = attr.nlink;
                     let uid = attr.uid;
                     let gid = attr.gid;
@@ -170,7 +170,7 @@ impl Filesystem for GrpcFsClient{
                                 } else {
                                     fuse3::FileType::RegularFile
                                 },
-                                perm: 0o600, //perm as u16,
+                                perm: perm as u16,
                                 nlink,
                                 uid,
                                 gid,
@@ -293,7 +293,7 @@ impl Filesystem for GrpcFsClient{
                                 } else {
                                     fuse3::FileType::RegularFile
                                 },
-                                perm: 0o600, // attr.permission as u16,
+                                perm: attr.permission as u16,
                                 nlink: attr.nlink,
                                 uid: attr.uid,
                                 gid: attr.gid,
