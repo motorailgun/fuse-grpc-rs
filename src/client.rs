@@ -237,10 +237,6 @@ impl Filesystem for GrpcFsClient {
                             } else {
                                 inode
                             };
-                            futures::executor::block_on(self.append_inode(
-                                inode,
-                                Path::new(&path).join(&name).to_str().unwrap().to_string(),
-                            ));
 
                             Ok(DirectoryEntry {
                                 inode,
@@ -256,6 +252,15 @@ impl Filesystem for GrpcFsClient {
                             })
                         })
                         .collect();
+
+                        for entry in entries.iter() {
+                            let entry = entry.clone().unwrap();
+                            self.append_inode(
+                                entry.inode,
+                                Path::new(&path).join(&(entry.name)).to_str().unwrap().to_string(),
+                            ).await;
+                        };
+
                     Ok(ReplyDirectory {
                         entries: stream::iter(entries.into_iter().skip(offset as usize)),
                     })
@@ -289,6 +294,7 @@ impl Filesystem for GrpcFsClient {
             let response = client.read_dir_plus(request).await;
             match response {
                 Ok(response) => {
+                    // TODO: add preceding entries('.' and '..')
                     let entries: Vec<_> = response
                         .into_inner()
                         .entries
@@ -302,24 +308,9 @@ impl Filesystem for GrpcFsClient {
                                 attr,
                             } = entry;
 
-                            if attr.is_none() {
-                                warn!("empty attr on readdirplus!");
-                                return Err(libc::ENOENT.into());
-                            }
-                            let attr = attr.unwrap();
-                            let inode = if name == "." || name == ".." {
-                                1
-                            } else {
-                                inode
-                            };
-                            futures::executor::block_on(self.append_inode(
-                                inode,
-                                Path::new(&path).join(&name).to_str().unwrap().to_string(),
-                            ));
-
                             Ok(DirectoryEntryPlus {
                                 inode,
-                                offset: offset as i64,
+                                offset: offset as i64 + 2,
                                 kind: {
                                     if kind == rpc_fs::FileType::Directory.into() {
                                         fuse3::FileType::Directory
@@ -331,31 +322,115 @@ impl Filesystem for GrpcFsClient {
                                 generation: 0,
                                 entry_ttl: Duration::from_secs(1),
                                 attr_ttl: Duration::from_secs(1),
-                                attr: FileAttr {
-                                    ino: inode,
-                                    generation: 0,
-                                    size: attr.size,
-                                    blocks: attr.blocks,
-                                    atime: SystemTime::UNIX_EPOCH.into(),
-                                    mtime: SystemTime::UNIX_EPOCH.into(),
-                                    ctime: SystemTime::UNIX_EPOCH.into(),
-                                    kind: if kind == rpc_fs::FileType::Directory.into() {
-                                        fuse3::FileType::Directory
-                                    } else {
-                                        fuse3::FileType::RegularFile
+                                attr: match attr {
+                                    Some(attr) => FileAttr {
+                                        ino: inode,
+                                        generation: 0,
+                                        size: attr.size,
+                                        blocks: attr.blocks,
+                                        atime: SystemTime::UNIX_EPOCH.into(),
+                                        mtime: SystemTime::UNIX_EPOCH.into(),
+                                        ctime: SystemTime::UNIX_EPOCH.into(),
+                                        kind: if kind == rpc_fs::FileType::Directory.into() {
+                                            fuse3::FileType::Directory
+                                        } else {
+                                            fuse3::FileType::RegularFile
+                                        },
+                                        perm: attr.permission as u16,
+                                        nlink: attr.nlink,
+                                        uid: attr.uid,
+                                        gid: attr.gid,
+                                        rdev: attr.rdev,
+                                        blksize: attr.blksize,
                                     },
-                                    perm: attr.permission as u16,
-                                    nlink: attr.nlink,
-                                    uid: attr.uid,
-                                    gid: attr.gid,
-                                    rdev: attr.rdev,
-                                    blksize: attr.blksize,
+                                    _ => FileAttr {
+                                        ino: inode,
+                                        generation: 0,
+                                        size: 0,
+                                        blocks: 0,
+                                        atime: SystemTime::UNIX_EPOCH.into(),
+                                        mtime: SystemTime::UNIX_EPOCH.into(),
+                                        ctime: SystemTime::UNIX_EPOCH.into(),
+                                        kind: fuse3::FileType::RegularFile,
+                                        perm: 0o400,
+                                        nlink: 0,
+                                        uid: 0,
+                                        gid: 0,
+                                        rdev: 0,
+                                        blksize: 0,
+                                    },
                                 },
                             })
                         })
                         .collect();
+
+
+                    for entry in entries.iter() {
+                        let entry = entry.clone().unwrap();
+                        self.append_inode(
+                            entry.inode,
+                            Path::new(&path).join(&(entry.name)).to_str().unwrap().to_string(),
+                        ).await;
+                    };
+                        
+
+                    let pre_chain: Vec<Result<DirectoryEntryPlus>> = vec![
+                        Ok(DirectoryEntryPlus {
+                            inode: parent,
+                            generation: 0,
+                            kind: fuse3::FileType::Directory,
+                            name: std::ffi::OsString::from("."),
+                            offset: 1,
+                            attr: FileAttr {
+                                ino: parent,
+                                generation: 0,
+                                size: 0,
+                                blocks: 0,
+                                atime: SystemTime::UNIX_EPOCH.into(),
+                                mtime: SystemTime::UNIX_EPOCH.into(),
+                                ctime: SystemTime::UNIX_EPOCH.into(),
+                                kind: fuse3::FileType::Directory,
+                                perm: 0o777,
+                                nlink: 0,
+                                uid: 0,
+                                gid: 0,
+                                rdev: 0,
+                                blksize: 0,
+                            },
+                            attr_ttl: Duration::from_secs(1),
+                            entry_ttl: Duration::from_secs(1),
+                        }),
+                        Ok(DirectoryEntryPlus {
+                            inode: 1,
+                            generation: 0,
+                            kind: fuse3::FileType::Directory,
+                            name: std::ffi::OsString::from(".."),
+                            offset: 1,
+                            attr: FileAttr {
+                                ino: 1,
+                                generation: 0,
+                                size: 0,
+                                blocks: 0,
+                                atime: SystemTime::UNIX_EPOCH.into(),
+                                mtime: SystemTime::UNIX_EPOCH.into(),
+                                ctime: SystemTime::UNIX_EPOCH.into(),
+                                kind: fuse3::FileType::Directory,
+                                perm: 0o777,
+                                nlink: 0,
+                                uid: 0,
+                                gid: 0,
+                                rdev: 0,
+                                blksize: 0,
+                            },
+                            attr_ttl: Duration::from_secs(1),
+                            entry_ttl: Duration::from_secs(1),
+                        }),
+                    ];
+
+                    let chain:Vec<_> = pre_chain.into_iter().chain(entries.into_iter()).collect();
+                    
                     Ok(ReplyDirectoryPlus {
-                        entries: stream::iter(entries.into_iter().skip(offset as usize)),
+                        entries: stream::iter(chain.into_iter().skip(offset as usize)),
                     })
                 }
                 Err(_) => {
