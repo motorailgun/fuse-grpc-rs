@@ -56,7 +56,7 @@ message DEntryPlus {
     uint64 offset = 2;
     string name = 3;
     FileType kind = 4;
-    Attr attr = 5;
+    optional Attr attr = 5;
 }
 
 message ReadDirPlusReply {
