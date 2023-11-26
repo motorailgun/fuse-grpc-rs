@@ -176,18 +176,21 @@ impl RpcFs for GrpcFs {
                     let inode = entry.ino();
                     debug!("inode: {}, file_name: {:?}", inode, file_name);
 
-                    let dentry_metadata = fs::metadata(path.join(&file_name)).unwrap();
-                    let attrs = rpc_fs::Attr {
-                        inode: dentry_metadata.ino(),
-                        size: dentry_metadata.size(),
-                        blocks: dentry_metadata.blocks(),
-                        kind: kind.into(),
-                        permission: dentry_metadata.permissions().mode(),
-                        nlink: dentry_metadata.nlink() as u32,
-                        uid: dentry_metadata.uid(),
-                        gid: dentry_metadata.gid(),
-                        rdev: dentry_metadata.rdev() as u32,
-                        blksize: dentry_metadata.blksize() as u32,
+                    let metadata = fs::metadata(path.join(&file_name));
+                    let attrs = match metadata {
+                        Ok(dentry_metadata) => Some(rpc_fs::Attr {
+                            inode: dentry_metadata.ino(),
+                            size: dentry_metadata.size(),
+                            blocks: dentry_metadata.blocks(),
+                            kind: kind.into(),
+                            permission: dentry_metadata.permissions().mode(),
+                            nlink: dentry_metadata.nlink() as u32,
+                            uid: dentry_metadata.uid(),
+                            gid: dentry_metadata.gid(),
+                            rdev: dentry_metadata.rdev() as u32,
+                            blksize: dentry_metadata.blksize() as u32,
+                        }),
+                        Err(_) => None,
                     };
 
                     rpc_fs::DEntryPlus {
@@ -195,7 +198,7 @@ impl RpcFs for GrpcFs {
                         offset: idx as u64 + 1,
                         name: file_name,
                         kind: kind.into(),
-                        attr: Some(attrs),
+                        attr: attrs,
                     }
                 })
                 .collect();
