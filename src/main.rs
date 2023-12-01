@@ -25,7 +25,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(subcommand) = args.get(1) {
         match &**subcommand {
             "server" => {
-                let addr = "[::1]:50051".parse()?;
+                // let addr = "0.0.0.0:50051".parse()?;
+                let addr = std::env::var("SERVER_ADDRESS").unwrap().parse()?;
                 let grpc_fs = GrpcFs::default();
 
                 Server::builder()
