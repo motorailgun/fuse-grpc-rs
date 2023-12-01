@@ -4,7 +4,7 @@ Run:
 ```bash
 $ cargo run [server | client]
 ```
-Note: currently mountpoint and listen/connection address is hard-corded, which are `/tmp/mnt` and `[::1]:50050`, accordingly.
+Note: currently mountpoint and listen/connection address is hard-corded, which are `/tmp/mnt` and `[::1]:50050`, respectively.
 
 ## Acknowledgement
 Thanks to
